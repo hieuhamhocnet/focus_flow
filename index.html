@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Focus Flow: Tiêu Điểm Mỗi Ngày</title>
+    <title>Focus Flow</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
@@ -24,10 +24,8 @@
             --shadow-light: rgba(255, 255, 255, 0.9);
             --shadow-dark: rgba(200, 209, 224, 0.7);
             --primary-color: #34D399;
-            /* Emerald */
             --primary-dark: #069466;
             --secondary-color: #F87171;
-            /* Red */
             --input-bg: rgba(255, 255, 255, 0.8);
             --input-text: #1E293B;
             --input-placeholder: #6B7280;
@@ -35,17 +33,11 @@
         
         body.dark-mode {
             --bg-color: #111827;
-            /* gray-900 */
             --text-color: #D1D5DB;
-            /* gray-300 */
             --text-heading: #F9FAFB;
-            /* gray-50 */
             --text-subtle: #9CA3AF;
-            /* gray-400 */
             --card-bg: rgba(31, 41, 55, 0.7);
-            /* gray-800 with transparency */
             --shadow-light: rgba(55, 65, 81, 0.9);
-            /* gray-700 */
             --shadow-dark: rgba(0, 0, 0, 0.7);
             --input-bg: rgba(55, 65, 81, 0.5);
             --input-text: #F9FAFB;
@@ -204,14 +196,11 @@
 
     <div class="main-container w-full">
         <div class="max-w-7xl mx-auto md:grid md:grid-cols-3 md:gap-12">
-            <!-- Left Column: Guide -->
             <aside class="md:col-span-1 mb-12 md:mb-0">
                 <div id="guide-placeholder" class="space-y-6">
-                    <!-- The markdown content will be injected here -->
                 </div>
             </aside>
 
-            <!-- Right Column: Main App -->
             <div class="md:col-span-2">
                 <div id="app" class="w-full max-w-2xl mx-auto space-y-8">
                     <header class="text-center">
@@ -243,7 +232,6 @@
     </div>
 
     <script>
-        // FULL APP LOGIC
         const App = {
             elements: {
                 app: document.getElementById('app'),
@@ -277,7 +265,6 @@
                 theme: 'light',
             },
 
-            // --- ALL OTHER MODULES (effects, three, etc.) remain the same ---
             effects: {
                 synth: null,
                 ambientPlayer: null,
@@ -362,7 +349,6 @@
                 }
             },
 
-            // Initialization
             init() {
                 this.loadState();
                 this.loadTheme();
@@ -373,7 +359,6 @@
                 this.render();
             },
 
-            // State Management
             saveState() {
                 if (this.state.pomodoro.isRunning) {
                     this.state.pomodoro.savedAt = Date.now();
@@ -408,7 +393,6 @@
                 this.updateStreak();
             },
 
-            // Event Binding
             bindEvents() {
                 this.elements.soundToggle.addEventListener('click', async() => {
                     await Tone.start();
@@ -416,7 +400,6 @@
                 });
                 this.elements.themeToggle.addEventListener('click', this.toggleTheme.bind(this));
 
-                // Unified Drag/Drop handlers on containers
                 this.elements.upcomingTasksSection.addEventListener('dragover', this.handleDragOver.bind(this));
                 this.elements.upcomingTasksSection.addEventListener('drop', this.handleDrop.bind(this));
                 this.elements.focusTaskSection.addEventListener('dragover', this.handleDragOver.bind(this));
@@ -424,7 +407,6 @@
 
             },
 
-            // Rendering
             render() {
                 this.renderAddTask();
                 this.renderFocusTask();
@@ -517,7 +499,6 @@
                 }
             },
 
-            // Handlers
             handleAddTask(e) {
                 e.preventDefault();
                 this.effects.sounds.add();
@@ -581,7 +562,6 @@
                 const focusCard = this.elements.focusTaskSection.querySelector('.clay-card');
                 const upcomingTask = e.target.closest('.draggable-task');
 
-                // Clear all indicators first
                 document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
                 if (focusCard) focusCard.classList.remove('focus-drop-target');
 
@@ -641,11 +621,9 @@
                 newFocused.isFocused = true;
 
                 this.resetPomodoro(newFocused);
-                // No need to save/render here, handleDrop will do it.
             },
 
 
-            // Pomodoro Logic
             togglePomodoro() {
                 this.state.pomodoro.isRunning = !this.state.pomodoro.isRunning;
                 if (this.state.pomodoro.isRunning) this.startPomodoro();
@@ -698,7 +676,6 @@
                 cancelAnimationFrame(this.state.pomodoro.visualTimerId);
             },
 
-            // Streak Logic
             updateStreak(completed = false) {
                 const today = new Date().toDateString();
                 const lastDay = this.state.stats.lastCompleted ? new Date(this.state.stats.lastCompleted).toDateString() : null;
@@ -719,7 +696,6 @@
                 this.saveState();
             },
 
-            // Theme Logic
             toggleTheme() {
                 this.state.theme = this.state.theme === 'light' ? 'dark' : 'light';
                 localStorage.setItem('focusFlowTheme', this.state.theme);
@@ -742,7 +718,6 @@
                 this.applyTheme();
             },
 
-            // Guide Injector
             injectGuideContent() {
                 const guideHTML = `
                     <div class="space-y-6">
@@ -765,7 +740,6 @@
                 this.elements.guidePlaceholder.innerHTML = guideHTML;
             },
 
-            // Helper Functions
             helpers: {
                 parseTimeInput(str) {
                     let totalSeconds = 0;
