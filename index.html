@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Focus Flow: Tiêu Điểm Mỗi Ngày</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' fill='white'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-size='32' font-family='Arial' fill='black'>FC</text></svg>">
+
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+         :root {
+            --bg-color: #F0F5F9;
+            --text-color: #1E293B;
+            --text-heading: #1E293B;
+            --text-subtle: #475569;
+            --card-bg: rgba(255, 255, 255, 0.7);
+            --shadow-light: rgba(255, 255, 255, 0.9);
+            --shadow-dark: rgba(200, 209, 224, 0.7);
+            --primary-color: #34D399;
+            /* Emerald */
+            --primary-dark: #069466;
+            --secondary-color: #F87171;
+            /* Red */
+            --input-bg: rgba(255, 255, 255, 0.8);
+            --input-text: #1E293B;
+            --input-placeholder: #6B7280;
+        }
+        
+        body.dark-mode {
+            --bg-color: #111827;
+            /* gray-900 */
+            --text-color: #D1D5DB;
+            /* gray-300 */
+            --text-heading: #F9FAFB;
+            /* gray-50 */
+            --text-subtle: #9CA3AF;
+            /* gray-400 */
+            --card-bg: rgba(31, 41, 55, 0.7);
+            /* gray-800 with transparency */
+            --shadow-light: rgba(55, 65, 81, 0.9);
+            /* gray-700 */
+            --shadow-dark: rgba(0, 0, 0, 0.7);
+            --input-bg: rgba(55, 65, 81, 0.5);
+            --input-text: #F9FAFB;
+            --input-placeholder: #9CA3AF;
+        }
+        
+        body {
+            font-family: 'Be Vietnam Pro', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            overflow: hidden;
+            transition: background-color 0.5s ease;
+        }
+        
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+        
+        .main-container {
+            position: relative;
+            z-index: 1;
+            height: 100vh;
+            overflow-y: auto;
+            padding: 2rem 1rem;
+        }
+        
+        .clay-card {
+            background: var(--card-bg);
+            border-radius: 24px;
+            box-shadow: -8px -8px 16px var(--shadow-light), 8px 8px 16px var(--shadow-dark);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+            will-change: transform, box-shadow, background, border;
+        }
+        
+        .clay-card:hover {
+            box-shadow: -2px -2px 8px var(--shadow-light), 2px 2px 8px var(--shadow-dark);
+        }
+        
+        .clay-btn {
+            border-radius: 16px;
+            font-weight: 600;
+            color: white;
+            box-shadow: -4px -4px 8px rgba(255, 255, 255, 0.6), 4px 4px 8px rgba(0, 0, 0, 0.15);
+            transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+            will-change: transform, box-shadow;
+        }
+        
+        .clay-btn:active {
+            box-shadow: inset -3px -3px 7px rgba(255, 255, 255, 0.5), inset 3px 3px 7px rgba(0, 0, 0, 0.15);
+            transform: translateY(1px);
+        }
+        
+        .btn-primary {
+            background-color: var(--primary-color);
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--primary-dark);
+        }
+        
+        .btn-secondary {
+            background-color: var(--secondary-color);
+        }
+        
+        .focused-task {
+            transform: scale(1.03);
+            box-shadow: 0 0 50px rgba(52, 211, 153, 0.5), -8px -8px 16px var(--shadow-light), 8px 8px 16px var(--shadow-dark);
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+        
+        .fade-out {
+            animation: fadeOut 0.5s cubic-bezier(0.55, 0.085, 0.68, 0.53) forwards;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px) scale(0.98);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        
+        @keyframes fadeOut {
+            from {
+                opacity: 1;
+                transform: scale(1);
+            }
+            to {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+        }
+        
+        .draggable-task {
+            cursor: grab;
+        }
+        
+        .drag-over {
+            border-top: 2px dashed var(--primary-color);
+        }
+        
+        .focus-drop-target {
+            border-style: dashed;
+            border-color: var(--primary-color);
+            transform: scale(1.05);
+        }
+        
+        #milli-display {
+            animation: milli-pulse 1s infinite alternate ease-in-out;
+            will-change: opacity;
+        }
+        
+        @keyframes milli-pulse {
+            from {
+                opacity: 0.5;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+        
+        .header-title {
+            color: var(--text-heading);
+        }
+        
+        .header-subtitle {
+            color: var(--text-subtle);
+        }
+        
+        .form-input {
+            background-color: var(--input-bg);
+            color: var(--input-text);
+            transition: background-color 0.5s ease, color 0.5s ease;
+        }
+        
+        .form-input::placeholder {
+            color: var(--input-placeholder);
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="bg-canvas"></canvas>
+
+    <div class="main-container w-full">
+        <div class="max-w-7xl mx-auto md:grid md:grid-cols-3 md:gap-12">
+            <!-- Left Column: Guide -->
+            <aside class="md:col-span-1 mb-12 md:mb-0">
+                <div id="guide-placeholder" class="space-y-6">
+                    <!-- The markdown content will be injected here -->
+                </div>
+            </aside>
+
+            <!-- Right Column: Main App -->
+            <div class="md:col-span-2">
+                <div id="app" class="w-full max-w-2xl mx-auto space-y-8">
+                    <header class="text-center">
+                        <h1 class="header-title text-4xl md:text-5xl font-bold tracking-tight">Focus Flow</h1>
+                        <div class="flex items-center justify-center gap-4 mt-3 header-subtitle">
+                            <p>Chuỗi ngày: <span id="streak-count" class="font-bold">0</span></p>
+                            <div class="flex items-center gap-2">
+                                <button id="sound-toggle" class="p-2 rounded-full hover:bg-white/50 transition">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /></svg>
+                                </button>
+                                <button id="theme-toggle" class="p-2 rounded-full hover:bg-white/50 transition">
+                                    <svg id="theme-icon-dark" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
+                                    <svg id="theme-icon-light" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m8.66-15.66l-.707.707M4.04 19.96l-.707.707M21 12h-1M4 12H3m15.66 8.66l-.707-.707M4.04 4.04l-.707-.707" /></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+
+                    <main class="space-y-6">
+                        <section id="add-task-section"></section>
+                        <section id="focus-task-section" class="min-h-[22rem] flex items-center justify-center"></section>
+                        <section id="upcoming-tasks-section"></section>
+                    </main>
+
+                    <footer id="reset-footer" class="text-center pt-4"></footer>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // FULL APP LOGIC
+        const App = {
+            elements: {
+                app: document.getElementById('app'),
+                addTaskSection: document.getElementById('add-task-section'),
+                focusTaskSection: document.getElementById('focus-task-section'),
+                upcomingTasksSection: document.getElementById('upcoming-tasks-section'),
+                resetFooter: document.getElementById('reset-footer'),
+                streakCount: document.getElementById('streak-count'),
+                soundToggle: document.getElementById('sound-toggle'),
+                guidePlaceholder: document.getElementById('guide-placeholder'),
+                themeToggle: document.getElementById('theme-toggle'),
+                themeIconDark: document.getElementById('theme-icon-dark'),
+                themeIconLight: document.getElementById('theme-icon-light'),
+            },
+            state: {
+                tasks: [],
+                stats: {
+                    streak: 0,
+                    lastCompleted: null
+                },
+                pomodoro: {
+                    timerId: null,
+                    visualTimerId: null,
+                    initialTime: 25 * 60,
+                    timeLeft: 25 * 60,
+                    isRunning: false,
+                    savedAt: null,
+                },
+                soundOn: false,
+                draggedTaskId: null,
+                theme: 'light',
+            },
+
+            // --- ALL OTHER MODULES (effects, three, etc.) remain the same ---
+            effects: {
+                synth: null,
+                ambientPlayer: null,
+                sounds: {
+                    add: () => App.effects.synth.triggerAttackRelease("C5", "8n"),
+                    complete: () => App.effects.synth.triggerAttackRelease("G5", "8n"),
+                    timerStart: () => App.effects.synth.triggerAttackRelease("C4", "8n"),
+                    timerEnd: () => new Tone.PolySynth(Tone.Synth).toDestination().triggerAttackRelease(["C5", "E5", "G5"], "4n"),
+                    swap: () => App.effects.synth.triggerAttackRelease("E4", "8n"),
+                },
+                initSounds() {
+                    this.synth = new Tone.Synth().toDestination();
+                    this.ambientPlayer = new Tone.Player({
+                        url: "https://cdn.pixabay.com/audio/2022/10/18/audio_b7226i22.mp3",
+                        loop: true,
+                        volume: -15,
+                    }).toDestination();
+                },
+                toggleAmbient() {
+                    App.state.soundOn = !App.state.soundOn;
+                    App.elements.soundToggle.classList.toggle('bg-emerald-200', App.state.soundOn);
+                    if (App.state.soundOn) this.ambientPlayer.start();
+                    else this.ambientPlayer.stop();
+                },
+                celebrate() {
+                    confetti({
+                        particleCount: 150,
+                        spread: 90,
+                        origin: {
+                            y: 0.6
+                        }
+                    });
+                }
+            },
+            three: {
+                scene: null,
+                camera: null,
+                renderer: null,
+                particles: null,
+                init() {
+                    const canvas = document.getElementById('bg-canvas');
+                    this.scene = new THREE.Scene();
+                    this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                    this.renderer = new THREE.WebGLRenderer({
+                        canvas: canvas,
+                        alpha: true,
+                        antialias: true
+                    });
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                    this.camera.position.z = 5;
+                    const particleGeometry = new THREE.BufferGeometry;
+                    const particleCount = 5000;
+                    const posArray = new Float32Array(particleCount * 3);
+                    for (let i = 0; i < particleCount * 3; i++) posArray[i] = (Math.random() - 0.5) * 10;
+                    particleGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+                    this.particles = new THREE.Points(particleGeometry, new THREE.PointsMaterial({
+                        size: 0.005,
+                        color: 0x34D399
+                    }));
+                    this.scene.add(this.particles);
+                    window.addEventListener('resize', this.onWindowResize.bind(this));
+                    document.addEventListener('mousemove', this.onMouseMove.bind(this));
+                    this.animate();
+                },
+                onWindowResize() {
+                    this.camera.aspect = window.innerWidth / window.innerHeight;
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                },
+                onMouseMove(event) {
+                    const mouseX = event.clientX / window.innerWidth - 0.5;
+                    const mouseY = event.clientY / window.innerHeight - 0.5;
+                    if (this.particles) {
+                        this.particles.rotation.y = mouseX * 0.2;
+                        this.particles.rotation.x = mouseY * 0.2;
+                    }
+                },
+                animate() {
+                    requestAnimationFrame(this.animate.bind(this));
+                    if (this.particles) this.particles.rotation.z += 0.0003;
+                    this.renderer.render(this.scene, this.camera);
+                }
+            },
+
+            // Initialization
+            init() {
+                this.loadState();
+                this.loadTheme();
+                this.three.init();
+                this.effects.initSounds();
+                this.bindEvents();
+                this.injectGuideContent();
+                this.render();
+            },
+
+            // State Management
+            saveState() {
+                if (this.state.pomodoro.isRunning) {
+                    this.state.pomodoro.savedAt = Date.now();
+                }
+                localStorage.setItem('focusFlowState', JSON.stringify({
+                    tasks: this.state.tasks,
+                    stats: this.state.stats,
+                    pomodoro: this.state.pomodoro
+                }));
+            },
+            loadState() {
+                const saved = JSON.parse(localStorage.getItem('focusFlowState'));
+                if (!saved) return;
+                this.state.tasks = saved.tasks || [];
+                this.state.stats = saved.stats || {
+                    streak: 0,
+                    lastCompleted: null
+                };
+                if (saved.pomodoro) {
+                    this.state.pomodoro = saved.pomodoro;
+                    if (this.state.pomodoro.isRunning && this.state.pomodoro.savedAt) {
+                        const elapsedSeconds = Math.round((Date.now() - this.state.pomodoro.savedAt) / 1000);
+                        this.state.pomodoro.timeLeft -= elapsedSeconds;
+                        if (this.state.pomodoro.timeLeft > 0) {
+                            this.startPomodoro(false);
+                        } else {
+                            this.state.pomodoro.timeLeft = 0;
+                            this.resetPomodoro(this.state.tasks.find(t => t.isFocused));
+                        }
+                    }
+                }
+                this.updateStreak();
+            },
+
+            // Event Binding
+            bindEvents() {
+                this.elements.soundToggle.addEventListener('click', async() => {
+                    await Tone.start();
+                    this.effects.toggleAmbient();
+                });
+                this.elements.themeToggle.addEventListener('click', this.toggleTheme.bind(this));
+
+                // Unified Drag/Drop handlers on containers
+                this.elements.upcomingTasksSection.addEventListener('dragover', this.handleDragOver.bind(this));
+                this.elements.upcomingTasksSection.addEventListener('drop', this.handleDrop.bind(this));
+                this.elements.focusTaskSection.addEventListener('dragover', this.handleDragOver.bind(this));
+                this.elements.focusTaskSection.addEventListener('drop', this.handleDrop.bind(this));
+
+            },
+
+            // Rendering
+            render() {
+                this.renderAddTask();
+                this.renderFocusTask();
+                this.renderUpcomingTasks();
+                this.renderFooter();
+                this.elements.streakCount.textContent = this.state.stats.streak;
+            },
+
+            renderAddTask() {
+                const {
+                    addTaskSection
+                } = this.elements;
+                addTaskSection.innerHTML = '';
+                if (this.state.tasks.length < 3) {
+                    const form = document.createElement('form');
+                    form.className = 'clay-card p-6 fade-in';
+                    form.innerHTML = `
+                        <h2 class="text-xl font-bold header-title mb-4">Thêm mục tiêu mới</h2>
+                        <input type="text" id="task-input" required placeholder="Tên mục tiêu..." class="form-input w-full px-4 py-3 mb-4 border border-transparent rounded-xl focus:ring-2 focus:ring-emerald-400 outline-none">
+                        <input type="number" id="time-input" required placeholder="Thời gian dự kiến (vd: 30 phút, 1 giờ)..." class="form-input w-full px-4 py-3 mb-4 border border-transparent rounded-xl focus:ring-2 focus:ring-emerald-400 outline-none">
+                        <button type="submit" class="clay-btn btn-primary w-full py-3">Thêm Mục Tiêu</button>`;
+                    addTaskSection.appendChild(form);
+                    form.addEventListener('submit', this.handleAddTask.bind(this));
+                }
+            },
+
+            renderFocusTask() {
+                const {
+                    focusTaskSection
+                } = this.elements;
+                focusTaskSection.innerHTML = '';
+                const focusedTask = this.state.tasks.find(t => t.isFocused);
+
+                if (focusedTask) {
+                    const card = document.createElement('div');
+                    card.className = 'clay-card focused-task w-full p-6 text-center fade-in';
+                    card.id = `task-${focusedTask.id}`;
+                    const time = this.state.pomodoro.timeLeft;
+                    const minutes = Math.floor(time / 60).toString().padStart(2, '0');
+                    const seconds = (time % 60).toString().padStart(2, '0');
+
+                    card.innerHTML = `
+                        <h3 class="text-2xl font-bold header-title">${focusedTask.text}</h3>
+                        <p class="header-subtitle mt-1 mb-4">Dự kiến: ${focusedTask.time}</p>
+                        <div id="pomodoro-timer" class="my-4">
+                            <p class="text-6xl font-bold text-emerald-600 flex items-center justify-center">${minutes}:${seconds}<span id="milli-display" class="text-2xl ml-2 text-emerald-500">.00</span></p>
+                        </div>
+                        <div class="flex gap-4 mb-4">
+                           <button id="pomodoro-toggle" class="clay-btn btn-primary w-full py-3">${this.state.pomodoro.isRunning ? 'Tạm Dừng' : 'Bắt Đầu'}</button>
+                           <button data-id="${focusedTask.id}" class="complete-btn clay-btn bg-emerald-500 w-full py-3">Hoàn Thành</button>
+                        </div>`;
+                    focusTaskSection.appendChild(card);
+                    card.querySelector('.complete-btn').addEventListener('click', (e) => this.completeTask(Number(e.target.dataset.id)));
+                    card.querySelector('#pomodoro-toggle').addEventListener('click', this.togglePomodoro.bind(this));
+                } else if (this.state.tasks.length === 0) {
+                    focusTaskSection.innerHTML = `<div class="text-center header-subtitle fade-in"><p>Hãy bắt đầu bằng việc thêm 3 mục tiêu quan trọng nhất cho hôm nay.</p></div>`;
+                }
+            },
+
+            renderUpcomingTasks() {
+                const {
+                    upcomingTasksSection
+                } = this.elements;
+                upcomingTasksSection.innerHTML = '';
+                const upcomingTasks = this.state.tasks.filter(t => !t.isFocused);
+
+                if (upcomingTasks.length > 0) {
+                    const container = document.createElement('div');
+                    container.className = 'space-y-3 fade-in';
+                    let html = '<h2 class="text-lg font-semibold text-center header-subtitle mb-2">Tiếp theo (Kéo để hoán đổi)</h2>';
+                    upcomingTasks.forEach(task => {
+                        html += `<div class="clay-card p-4 opacity-80 draggable-task" draggable="true" data-task-id="${task.id}"><h3 class="font-semibold pointer-events-none header-title">${task.text}</h3></div>`;
+                    });
+                    container.innerHTML = html;
+                    upcomingTasksSection.appendChild(container);
+                    upcomingTasksSection.querySelectorAll('.draggable-task').forEach(taskEl => {
+                        taskEl.addEventListener('dragstart', this.handleDragStart.bind(this));
+                    });
+                }
+            },
+
+            renderFooter() {
+                if (this.state.tasks.length > 0) {
+                    this.elements.resetFooter.innerHTML = `<button id="reset-button" class="clay-btn btn-secondary text-sm py-2 px-5 opacity-80">Thiết lập lại</button>`;
+                    document.getElementById('reset-button').addEventListener('click', () => {
+                        if (confirm("Bạn có chắc chắn muốn xóa mọi thứ?")) this.resetApp();
+                    });
+                } else {
+                    this.elements.resetFooter.innerHTML = '';
+                }
+            },
+
+            // Handlers
+            handleAddTask(e) {
+                e.preventDefault();
+                this.effects.sounds.add();
+                const taskInput = document.getElementById('task-input');
+                const timeInput = document.getElementById('time-input');
+                if (!taskInput.value.trim() || !timeInput.value.trim()) return;
+
+                const initialTime = this.helpers.parseTimeInput(timeInput.value);
+
+                const newTask = {
+                    id: Date.now(),
+                    text: taskInput.value,
+                    time: timeInput.value,
+                    initialTime,
+                    isFocused: this.state.tasks.length === 0
+                };
+                this.state.tasks.push(newTask);
+
+                if (newTask.isFocused) {
+                    this.resetPomodoro(newTask);
+                }
+
+                this.saveState();
+                this.render();
+            },
+
+            completeTask(id) {
+                this.effects.sounds.complete();
+                this.effects.celebrate();
+                this.updateStreak(true);
+                const taskElement = document.getElementById(`task-${id}`);
+                taskElement.classList.add('fade-out');
+                setTimeout(() => {
+                    this.state.tasks = this.state.tasks.filter(task => task.id !== id);
+                    const newFocusedTask = this.state.tasks[0];
+                    if (newFocusedTask) {
+                        newFocusedTask.isFocused = true;
+                        this.resetPomodoro(newFocusedTask);
+                    } else {
+                        this.resetPomodoro(null);
+                    }
+                    this.saveState();
+                    this.render();
+                }, 500);
+            },
+
+            resetApp() {
+                this.state.tasks = [];
+                this.state.stats.streak = 0;
+                this.resetPomodoro(null);
+                localStorage.removeItem('focusFlowState');
+                this.render();
+            },
+
+            handleDragStart(e) {
+                this.state.draggedTaskId = Number(e.target.dataset.taskId);
+                e.dataTransfer.effectAllowed = 'move';
+            },
+            handleDragOver(e) {
+                e.preventDefault();
+                const focusCard = this.elements.focusTaskSection.querySelector('.clay-card');
+                const upcomingTask = e.target.closest('.draggable-task');
+
+                // Clear all indicators first
+                document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+                if (focusCard) focusCard.classList.remove('focus-drop-target');
+
+                const dropOnFocus = e.target.closest('#focus-task-section');
+
+                if (dropOnFocus && focusCard) {
+                    focusCard.classList.add('focus-drop-target');
+                } else if (upcomingTask) {
+                    upcomingTask.classList.add('drag-over');
+                }
+            },
+            handleDrop(e) {
+                e.preventDefault();
+                const focusCard = this.elements.focusTaskSection.querySelector('.clay-card');
+                if (focusCard) focusCard.classList.remove('focus-drop-target');
+                document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+
+                const draggedId = this.state.draggedTaskId;
+                if (!draggedId) return;
+
+                const dropOnFocusZone = e.target.closest('#focus-task-section');
+                const dropOnUpcomingTask = e.target.closest('.draggable-task');
+
+                if (dropOnFocusZone) {
+                    this.swapFocus(draggedId);
+                } else if (dropOnUpcomingTask) {
+                    const droppedOnId = Number(dropOnUpcomingTask.dataset.taskId);
+                    if (draggedId === droppedOnId) return;
+
+                    const draggedIndex = this.state.tasks.findIndex(t => t.id === draggedId);
+                    const droppedOnIndex = this.state.tasks.findIndex(t => t.id === droppedOnId);
+
+                    const [draggedItem] = this.state.tasks.splice(draggedIndex, 1);
+                    this.state.tasks.splice(droppedOnIndex, 0, draggedItem);
+                }
+
+                this.state.draggedTaskId = null;
+                this.saveState();
+                this.render();
+            },
+
+            swapFocus(newFocusId) {
+                const currentFocused = this.state.tasks.find(t => t.isFocused);
+                const newFocused = this.state.tasks.find(t => t.id === newFocusId);
+
+                if (!newFocused || (currentFocused && currentFocused.id === newFocusId)) return;
+
+                this.effects.sounds.swap();
+
+                if (this.state.pomodoro.isRunning) {
+                    this.stopPomodoro();
+                }
+
+                if (currentFocused) {
+                    currentFocused.isFocused = false;
+                }
+                newFocused.isFocused = true;
+
+                this.resetPomodoro(newFocused);
+                // No need to save/render here, handleDrop will do it.
+            },
+
+
+            // Pomodoro Logic
+            togglePomodoro() {
+                this.state.pomodoro.isRunning = !this.state.pomodoro.isRunning;
+                if (this.state.pomodoro.isRunning) this.startPomodoro();
+                else this.stopPomodoro();
+            },
+            startPomodoro(playSound = true) {
+                if (playSound) this.effects.sounds.timerStart();
+                this.state.pomodoro.isRunning = true;
+                this.state.pomodoro.timerId = setInterval(this.tick.bind(this), 1000);
+                this.startVisualTimer();
+                this.renderFocusTask();
+            },
+            stopPomodoro() {
+                this.state.pomodoro.isRunning = false;
+                clearInterval(this.state.pomodoro.timerId);
+                this.stopVisualTimer();
+                this.saveState();
+                this.renderFocusTask();
+            },
+            tick() {
+                this.state.pomodoro.timeLeft--;
+                this.renderFocusTask();
+                if (this.state.pomodoro.timeLeft <= 0) {
+                    this.effects.sounds.timerEnd();
+                    this.stopPomodoro();
+                    alert("Hết giờ tập trung! Hãy nghỉ ngơi 5 phút.");
+                    this.resetPomodoro(this.state.tasks.find(t => t.isFocused));
+                }
+            },
+            resetPomodoro(task) {
+                this.stopPomodoro();
+                const initialTime = task ? task.initialTime : 25 * 60;
+                this.state.pomodoro.initialTime = initialTime;
+                this.state.pomodoro.timeLeft = initialTime;
+                this.state.pomodoro.savedAt = null;
+                this.saveState();
+                this.renderFocusTask();
+            },
+
+            startVisualTimer() {
+                function animateMilli() {
+                    if (!App.state.pomodoro.isRunning) return;
+                    const milliDisplay = document.getElementById('milli-display');
+                    if (milliDisplay) milliDisplay.textContent = `.${Math.floor(Math.random() * 90 + 10)}`;
+                    App.state.pomodoro.visualTimerId = requestAnimationFrame(animateMilli);
+                }
+                animateMilli();
+            },
+            stopVisualTimer() {
+                cancelAnimationFrame(this.state.pomodoro.visualTimerId);
+            },
+
+            // Streak Logic
+            updateStreak(completed = false) {
+                const today = new Date().toDateString();
+                const lastDay = this.state.stats.lastCompleted ? new Date(this.state.stats.lastCompleted).toDateString() : null;
+                if (completed) {
+                    if (today !== lastDay) {
+                        const yesterday = new Date();
+                        yesterday.setDate(yesterday.getDate() - 1);
+                        this.state.stats.streak = (lastDay === yesterday.toDateString()) ? this.state.stats.streak + 1 : 1;
+                        this.state.stats.lastCompleted = new Date().toISOString();
+                    }
+                } else {
+                    const yesterday = new Date();
+                    yesterday.setDate(yesterday.getDate() - 1);
+                    if (lastDay && lastDay !== today && lastDay !== yesterday.toDateString()) {
+                        this.state.stats.streak = 0;
+                    }
+                }
+                this.saveState();
+            },
+
+            // Theme Logic
+            toggleTheme() {
+                this.state.theme = this.state.theme === 'light' ? 'dark' : 'light';
+                localStorage.setItem('focusFlowTheme', this.state.theme);
+                this.applyTheme();
+            },
+            applyTheme() {
+                if (this.state.theme === 'dark') {
+                    document.body.classList.add('dark-mode');
+                    this.elements.themeIconDark.classList.remove('hidden');
+                    this.elements.themeIconLight.classList.add('hidden');
+                } else {
+                    document.body.classList.remove('dark-mode');
+                    this.elements.themeIconDark.classList.add('hidden');
+                    this.elements.themeIconLight.classList.remove('hidden');
+                }
+            },
+            loadTheme() {
+                const savedTheme = localStorage.getItem('focusFlowTheme') || 'light';
+                this.state.theme = savedTheme;
+                this.applyTheme();
+            },
+
+            // Guide Injector
+            injectGuideContent() {
+                const guideHTML = `
+                    <div class="space-y-6">
+                        <h2 class="text-2xl font-bold header-title">Góc Hiệu Suất</h2>
+                        <div class="clay-card p-5">
+                            <h3 class="font-semibold text-lg mb-2 header-title">Phương pháp Pomodoro</h3>
+                            <p class="text-sm">Chia công việc thành các phiên tập trung (vd: 25 phút) xen kẽ với các quãng nghỉ ngắn (5 phút). Sau 4 phiên, hãy nghỉ dài hơn.</p>
+                            <p class="text-sm mt-2 font-medium"><strong>Gợi ý:</strong> Học tập: 25-30 phút. Sáng tạo: 45-50 phút.</p>
+                        </div>
+                        <div class="clay-card p-5">
+                            <h3 class="font-semibold text-lg mb-2 header-title">Quy tắc 2 phút</h3>
+                            <p class="text-sm">Nếu một việc chỉ mất dưới 2 phút để hoàn thành, hãy làm nó ngay lập tức để tránh tồn đọng.</p>
+                        </div>
+                        <div class="clay-card p-5">
+                            <h3 class="font-semibold text-lg mb-2 header-title">Bắt đầu với việc khó nhất</h3>
+                            <p class="text-sm">Hoàn thành công việc "khó nhằn" nhất vào đầu ngày sẽ tạo đà và cảm giác thành tựu cho cả ngày dài.</p>
+                        </div>
+                    </div>
+                `;
+                this.elements.guidePlaceholder.innerHTML = guideHTML;
+            },
+
+            // Helper Functions
+            helpers: {
+                parseTimeInput(str) {
+                    let totalSeconds = 0;
+                    str = str.toLowerCase();
+                    const hoursMatch = str.match(/(\d+)\s*(giờ|h)/);
+                    const minutesMatch = str.match(/(\d+)\s*(phút|m)/);
+                    const numbersOnlyMatch = str.match(/^\d+$/);
+                    if (hoursMatch) totalSeconds += parseInt(hoursMatch[1], 10) * 3600;
+                    if (minutesMatch) totalSeconds += parseInt(minutesMatch[1], 10) * 60;
+                    if (totalSeconds === 0 && numbersOnlyMatch) {
+                        totalSeconds = parseInt(numbersOnlyMatch[0], 10) * 60;
+                    }
+                    return totalSeconds > 0 ? totalSeconds : 25 * 60;
+                }
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            App.init();
+        });
+    </script>
+</body>
+
+</html>
