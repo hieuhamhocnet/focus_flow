@@ -4,15 +4,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Focus Flow</title>
+    <title>Focus Flow: Tiêu Điểm Mỗi Ngày</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' fill='white'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-size='32' font-family='Arial' fill='black'>FC</text></svg>">
-
     <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
          :root {
@@ -157,20 +155,6 @@
             transform: scale(1.05);
         }
         
-        #milli-display {
-            animation: milli-pulse 1s infinite alternate ease-in-out;
-            will-change: opacity;
-        }
-        
-        @keyframes milli-pulse {
-            from {
-                opacity: 0.5;
-            }
-            to {
-                opacity: 1;
-            }
-        }
-        
         .header-title {
             color: var(--text-heading);
         }
@@ -254,17 +238,15 @@
                 },
                 pomodoro: {
                     timerId: null,
-                    visualTimerId: null,
                     initialTime: 25 * 60,
                     timeLeft: 25 * 60,
                     isRunning: false,
-                    savedAt: null,
+                    endTime: null,
                 },
                 soundOn: false,
                 draggedTaskId: null,
                 theme: 'light',
             },
-
             effects: {
                 synth: null,
                 ambientPlayer: null,
@@ -277,17 +259,16 @@
                 },
                 initSounds() {
                     this.synth = new Tone.Synth().toDestination();
-                    this.ambientPlayer = new Tone.Player({
-                        url: "https://cdn.pixabay.com/audio/2022/10/18/audio_b7226i22.mp3",
-                        loop: true,
-                        volume: -15,
+                    this.ambientPlayer = new Tone.NoiseSynth({
+                        type: "pink",
+                        volume: -25,
                     }).toDestination();
                 },
                 toggleAmbient() {
                     App.state.soundOn = !App.state.soundOn;
                     App.elements.soundToggle.classList.toggle('bg-emerald-200', App.state.soundOn);
-                    if (App.state.soundOn) this.ambientPlayer.start();
-                    else this.ambientPlayer.stop();
+                    if (App.state.soundOn) this.ambientPlayer.triggerAttack();
+                    else this.ambientPlayer.triggerRelease();
                 },
                 celebrate() {
                     confetti({
@@ -348,7 +329,6 @@
                     this.renderer.render(this.scene, this.camera);
                 }
             },
-
             init() {
                 this.loadState();
                 this.loadTheme();
@@ -358,15 +338,19 @@
                 this.injectGuideContent();
                 this.render();
             },
-
             saveState() {
-                if (this.state.pomodoro.isRunning) {
-                    this.state.pomodoro.savedAt = Date.now();
+                if (this.state.pomodoro.isRunning && this.state.pomodoro.endTime) {
+                    const remainingMilliseconds = this.state.pomodoro.endTime - Date.now();
+                    this.state.pomodoro.timeLeft = Math.max(0, Math.round(remainingMilliseconds / 1000));
                 }
                 localStorage.setItem('focusFlowState', JSON.stringify({
                     tasks: this.state.tasks,
                     stats: this.state.stats,
-                    pomodoro: this.state.pomodoro
+                    pomodoro: {
+                        initialTime: this.state.pomodoro.initialTime,
+                        timeLeft: this.state.pomodoro.timeLeft,
+                        isRunning: this.state.pomodoro.isRunning,
+                    }
                 }));
             },
             loadState() {
@@ -378,35 +362,25 @@
                     lastCompleted: null
                 };
                 if (saved.pomodoro) {
-                    this.state.pomodoro = saved.pomodoro;
-                    if (this.state.pomodoro.isRunning && this.state.pomodoro.savedAt) {
-                        const elapsedSeconds = Math.round((Date.now() - this.state.pomodoro.savedAt) / 1000);
-                        this.state.pomodoro.timeLeft -= elapsedSeconds;
-                        if (this.state.pomodoro.timeLeft > 0) {
-                            this.startPomodoro(false);
-                        } else {
-                            this.state.pomodoro.timeLeft = 0;
-                            this.resetPomodoro(this.state.tasks.find(t => t.isFocused));
-                        }
+                    this.state.pomodoro.initialTime = saved.pomodoro.initialTime || 25 * 60;
+                    this.state.pomodoro.timeLeft = saved.pomodoro.timeLeft || 25 * 60;
+                    if (saved.pomodoro.isRunning) {
+                        this.startPomodoro(false);
                     }
                 }
                 this.updateStreak();
             },
-
             bindEvents() {
                 this.elements.soundToggle.addEventListener('click', async() => {
                     await Tone.start();
                     this.effects.toggleAmbient();
                 });
                 this.elements.themeToggle.addEventListener('click', this.toggleTheme.bind(this));
-
                 this.elements.upcomingTasksSection.addEventListener('dragover', this.handleDragOver.bind(this));
                 this.elements.upcomingTasksSection.addEventListener('drop', this.handleDrop.bind(this));
                 this.elements.focusTaskSection.addEventListener('dragover', this.handleDragOver.bind(this));
                 this.elements.focusTaskSection.addEventListener('drop', this.handleDrop.bind(this));
-
             },
-
             render() {
                 this.renderAddTask();
                 this.renderFocusTask();
@@ -414,7 +388,6 @@
                 this.renderFooter();
                 this.elements.streakCount.textContent = this.state.stats.streak;
             },
-
             renderAddTask() {
                 const {
                     addTaskSection
@@ -426,20 +399,18 @@
                     form.innerHTML = `
                         <h2 class="text-xl font-bold header-title mb-4">Thêm mục tiêu mới</h2>
                         <input type="text" id="task-input" required placeholder="Tên mục tiêu..." class="form-input w-full px-4 py-3 mb-4 border border-transparent rounded-xl focus:ring-2 focus:ring-emerald-400 outline-none">
-                        <input type="number" id="time-input" required placeholder="Thời gian dự kiến (vd: 30 phút, 1 giờ)..." class="form-input w-full px-4 py-3 mb-4 border border-transparent rounded-xl focus:ring-2 focus:ring-emerald-400 outline-none">
+                        <input type="text" id="time-input" required placeholder="Thời gian dự kiến (vd: 30 phút, 1 giờ)..." class="form-input w-full px-4 py-3 mb-4 border border-transparent rounded-xl focus:ring-2 focus:ring-emerald-400 outline-none">
                         <button type="submit" class="clay-btn btn-primary w-full py-3">Thêm Mục Tiêu</button>`;
                     addTaskSection.appendChild(form);
                     form.addEventListener('submit', this.handleAddTask.bind(this));
                 }
             },
-
             renderFocusTask() {
                 const {
                     focusTaskSection
                 } = this.elements;
                 focusTaskSection.innerHTML = '';
                 const focusedTask = this.state.tasks.find(t => t.isFocused);
-
                 if (focusedTask) {
                     const card = document.createElement('div');
                     card.className = 'clay-card focused-task w-full p-6 text-center fade-in';
@@ -447,12 +418,11 @@
                     const time = this.state.pomodoro.timeLeft;
                     const minutes = Math.floor(time / 60).toString().padStart(2, '0');
                     const seconds = (time % 60).toString().padStart(2, '0');
-
                     card.innerHTML = `
                         <h3 class="text-2xl font-bold header-title">${focusedTask.text}</h3>
                         <p class="header-subtitle mt-1 mb-4">Dự kiến: ${focusedTask.time}</p>
                         <div id="pomodoro-timer" class="my-4">
-                            <p class="text-6xl font-bold text-emerald-600 flex items-center justify-center">${minutes}:${seconds}<span id="milli-display" class="text-2xl ml-2 text-emerald-500">.00</span></p>
+                            <p class="text-6xl font-bold text-emerald-600 flex items-center justify-center">${minutes}:${seconds}</p>
                         </div>
                         <div class="flex gap-4 mb-4">
                            <button id="pomodoro-toggle" class="clay-btn btn-primary w-full py-3">${this.state.pomodoro.isRunning ? 'Tạm Dừng' : 'Bắt Đầu'}</button>
@@ -465,14 +435,12 @@
                     focusTaskSection.innerHTML = `<div class="text-center header-subtitle fade-in"><p>Hãy bắt đầu bằng việc thêm 3 mục tiêu quan trọng nhất cho hôm nay.</p></div>`;
                 }
             },
-
             renderUpcomingTasks() {
                 const {
                     upcomingTasksSection
                 } = this.elements;
                 upcomingTasksSection.innerHTML = '';
                 const upcomingTasks = this.state.tasks.filter(t => !t.isFocused);
-
                 if (upcomingTasks.length > 0) {
                     const container = document.createElement('div');
                     container.className = 'space-y-3 fade-in';
@@ -487,7 +455,6 @@
                     });
                 }
             },
-
             renderFooter() {
                 if (this.state.tasks.length > 0) {
                     this.elements.resetFooter.innerHTML = `<button id="reset-button" class="clay-btn btn-secondary text-sm py-2 px-5 opacity-80">Thiết lập lại</button>`;
@@ -498,16 +465,13 @@
                     this.elements.resetFooter.innerHTML = '';
                 }
             },
-
             handleAddTask(e) {
                 e.preventDefault();
                 this.effects.sounds.add();
                 const taskInput = document.getElementById('task-input');
                 const timeInput = document.getElementById('time-input');
                 if (!taskInput.value.trim() || !timeInput.value.trim()) return;
-
                 const initialTime = this.helpers.parseTimeInput(timeInput.value);
-
                 const newTask = {
                     id: Date.now(),
                     text: taskInput.value,
@@ -516,15 +480,12 @@
                     isFocused: this.state.tasks.length === 0
                 };
                 this.state.tasks.push(newTask);
-
                 if (newTask.isFocused) {
                     this.resetPomodoro(newTask);
                 }
-
                 this.saveState();
                 this.render();
             },
-
             completeTask(id) {
                 this.effects.sounds.complete();
                 this.effects.celebrate();
@@ -544,7 +505,6 @@
                     this.render();
                 }, 500);
             },
-
             resetApp() {
                 this.state.tasks = [];
                 this.state.stats.streak = 0;
@@ -552,7 +512,6 @@
                 localStorage.removeItem('focusFlowState');
                 this.render();
             },
-
             handleDragStart(e) {
                 this.state.draggedTaskId = Number(e.target.dataset.taskId);
                 e.dataTransfer.effectAllowed = 'move';
@@ -561,12 +520,9 @@
                 e.preventDefault();
                 const focusCard = this.elements.focusTaskSection.querySelector('.clay-card');
                 const upcomingTask = e.target.closest('.draggable-task');
-
                 document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
                 if (focusCard) focusCard.classList.remove('focus-drop-target');
-
                 const dropOnFocus = e.target.closest('#focus-task-section');
-
                 if (dropOnFocus && focusCard) {
                     focusCard.classList.add('focus-drop-target');
                 } else if (upcomingTask) {
@@ -578,79 +534,85 @@
                 const focusCard = this.elements.focusTaskSection.querySelector('.clay-card');
                 if (focusCard) focusCard.classList.remove('focus-drop-target');
                 document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-
                 const draggedId = this.state.draggedTaskId;
                 if (!draggedId) return;
-
                 const dropOnFocusZone = e.target.closest('#focus-task-section');
                 const dropOnUpcomingTask = e.target.closest('.draggable-task');
-
                 if (dropOnFocusZone) {
                     this.swapFocus(draggedId);
                 } else if (dropOnUpcomingTask) {
                     const droppedOnId = Number(dropOnUpcomingTask.dataset.taskId);
                     if (draggedId === droppedOnId) return;
-
                     const draggedIndex = this.state.tasks.findIndex(t => t.id === draggedId);
                     const droppedOnIndex = this.state.tasks.findIndex(t => t.id === droppedOnId);
-
                     const [draggedItem] = this.state.tasks.splice(draggedIndex, 1);
                     this.state.tasks.splice(droppedOnIndex, 0, draggedItem);
                 }
-
                 this.state.draggedTaskId = null;
                 this.saveState();
                 this.render();
             },
-
             swapFocus(newFocusId) {
                 const currentFocused = this.state.tasks.find(t => t.isFocused);
                 const newFocused = this.state.tasks.find(t => t.id === newFocusId);
-
                 if (!newFocused || (currentFocused && currentFocused.id === newFocusId)) return;
-
                 this.effects.sounds.swap();
-
                 if (this.state.pomodoro.isRunning) {
                     this.stopPomodoro();
                 }
-
                 if (currentFocused) {
                     currentFocused.isFocused = false;
                 }
                 newFocused.isFocused = true;
-
                 this.resetPomodoro(newFocused);
             },
-
-
-            togglePomodoro() {
-                this.state.pomodoro.isRunning = !this.state.pomodoro.isRunning;
-                if (this.state.pomodoro.isRunning) this.startPomodoro();
-                else this.stopPomodoro();
+            async togglePomodoro() {
+                await Tone.start();
+                if (this.state.pomodoro.isRunning) {
+                    this.stopPomodoro();
+                } else {
+                    this.startPomodoro();
+                }
             },
             startPomodoro(playSound = true) {
+                if (this.state.pomodoro.isRunning) return;
                 if (playSound) this.effects.sounds.timerStart();
                 this.state.pomodoro.isRunning = true;
-                this.state.pomodoro.timerId = setInterval(this.tick.bind(this), 1000);
-                this.startVisualTimer();
-                this.renderFocusTask();
+                this.state.pomodoro.endTime = Date.now() + this.state.pomodoro.timeLeft * 1000;
+                this.state.pomodoro.timerId = setInterval(this.tick.bind(this), 500);
             },
             stopPomodoro() {
-                this.state.pomodoro.isRunning = false;
                 clearInterval(this.state.pomodoro.timerId);
-                this.stopVisualTimer();
+                const wasRunning = this.state.pomodoro.isRunning;
+                this.state.pomodoro.isRunning = false;
+                if (wasRunning && this.state.pomodoro.endTime) {
+                    const remainingMilliseconds = this.state.pomodoro.endTime - Date.now();
+                    this.state.pomodoro.timeLeft = Math.max(0, Math.round(remainingMilliseconds / 1000));
+                }
+                this.state.pomodoro.endTime = null;
                 this.saveState();
                 this.renderFocusTask();
             },
             tick() {
-                this.state.pomodoro.timeLeft--;
-                this.renderFocusTask();
-                if (this.state.pomodoro.timeLeft <= 0) {
+                const {
+                    pomodoro
+                } = this.state;
+                if (!pomodoro.isRunning || !pomodoro.endTime) {
+                    this.stopPomodoro();
+                    return;
+                }
+                const remainingMilliseconds = pomodoro.endTime - Date.now();
+                pomodoro.timeLeft = Math.round(remainingMilliseconds / 1000);
+
+                if (pomodoro.timeLeft <= 0) {
+                    pomodoro.timeLeft = 0;
+                    this.renderFocusTask();
                     this.effects.sounds.timerEnd();
                     this.stopPomodoro();
                     alert("Hết giờ tập trung! Hãy nghỉ ngơi 5 phút.");
                     this.resetPomodoro(this.state.tasks.find(t => t.isFocused));
+                } else {
+                    this.renderFocusTask();
                 }
             },
             resetPomodoro(task) {
@@ -658,24 +620,9 @@
                 const initialTime = task ? task.initialTime : 25 * 60;
                 this.state.pomodoro.initialTime = initialTime;
                 this.state.pomodoro.timeLeft = initialTime;
-                this.state.pomodoro.savedAt = null;
                 this.saveState();
                 this.renderFocusTask();
             },
-
-            startVisualTimer() {
-                function animateMilli() {
-                    if (!App.state.pomodoro.isRunning) return;
-                    const milliDisplay = document.getElementById('milli-display');
-                    if (milliDisplay) milliDisplay.textContent = `.${Math.floor(Math.random() * 90 + 10)}`;
-                    App.state.pomodoro.visualTimerId = requestAnimationFrame(animateMilli);
-                }
-                animateMilli();
-            },
-            stopVisualTimer() {
-                cancelAnimationFrame(this.state.pomodoro.visualTimerId);
-            },
-
             updateStreak(completed = false) {
                 const today = new Date().toDateString();
                 const lastDay = this.state.stats.lastCompleted ? new Date(this.state.stats.lastCompleted).toDateString() : null;
@@ -695,7 +642,6 @@
                 }
                 this.saveState();
             },
-
             toggleTheme() {
                 this.state.theme = this.state.theme === 'light' ? 'dark' : 'light';
                 localStorage.setItem('focusFlowTheme', this.state.theme);
@@ -717,7 +663,6 @@
                 this.state.theme = savedTheme;
                 this.applyTheme();
             },
-
             injectGuideContent() {
                 const guideHTML = `
                     <div class="space-y-6">
@@ -739,7 +684,6 @@
                 `;
                 this.elements.guidePlaceholder.innerHTML = guideHTML;
             },
-
             helpers: {
                 parseTimeInput(str) {
                     let totalSeconds = 0;
@@ -756,7 +700,6 @@
                 }
             }
         };
-
         document.addEventListener('DOMContentLoaded', () => {
             App.init();
         });
